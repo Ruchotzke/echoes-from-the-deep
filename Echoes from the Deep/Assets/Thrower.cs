@@ -14,8 +14,7 @@ public class Thrower : MonoBehaviour
         {
             /* Throw a box */
             var dir = Camera.main.ScreenPointToRay(Input.mousePosition);
-            var rb = Instantiate(pf_Box);
-            rb.transform.position = dir.origin;
+            var rb = Instantiate(pf_Box, dir.origin, Quaternion.identity);
             rb.AddForce(dir.direction * Force);
             Destroy(rb.gameObject, 5.0f);
         }
