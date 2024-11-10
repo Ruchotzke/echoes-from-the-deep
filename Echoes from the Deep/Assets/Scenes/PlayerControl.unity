@@ -2343,8 +2343,10 @@ MonoBehaviour:
   Acceleration: 200
   MaxForce: 150
   LateralDrag: 8
-  JumpForce: 500
+  JumpForce: 300
   JumpGracePeriod: 0.3
+  CoyoteTime: 0.5
+  MaxJumps: 2
 --- !u!4 &1181653538
 Transform:
   m_ObjectHideFlags: 0

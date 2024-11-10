@@ -28,6 +28,8 @@ public class PlayerController : MonoBehaviour
     [Header("Jumping")] 
     public float JumpForce = 10.0f;
     public float JumpGracePeriod = 1.0f;
+    public float CoyoteTime = 0.5f;
+    public int MaxJumps = 1;
 
     private Rigidbody rb;
     
@@ -35,6 +37,10 @@ public class PlayerController : MonoBehaviour
     private Vector3 forwardDirectionEuler;
 
     private bool inJumpGracePeriod = false;
+
+    private bool isAirborne = false;
+    private float timeSinceAirborne = 0.0f;
+    private int jumpsRemaining;
 
     private void Awake()
     {
@@ -47,6 +53,10 @@ public class PlayerController : MonoBehaviour
         forwardDirectionEuler = transform.forward;
         forwardDirectionEuler.y = 0;
         forwardDirectionEuler.Normalize();
+        
+        /* Handle airtime */
+        StartCoroutine(AirtimeTimer());
+        jumpsRemaining = MaxJumps;
     }
 
     private void Update()
@@ -62,9 +72,12 @@ public class PlayerController : MonoBehaviour
         forwardDirectionEuler.y += Sensitivity * mouse.x * Time.deltaTime;
         
         /* Jumping */
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.Space) && (jumpsRemaining > 0 || timeSinceAirborne <= CoyoteTime))
         {
+            if (rb.velocity.y < 0) rb.velocity = new Vector3(rb.velocity.x, 0.0f, rb.velocity.z);
             rb.AddForce(Vector3.up * JumpForce);
+            jumpsRemaining -= 1;
+            Debug.Log(jumpsRemaining);
             if (!inJumpGracePeriod) StartCoroutine(OnJumpCoroutine());
         }
     }
@@ -113,6 +126,9 @@ public class PlayerController : MonoBehaviour
         /* Raycast down to get height */
         if (!inJumpGracePeriod && Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, MaxAttachHeight, ~LayerMask.NameToLayer("Player")))
         {
+            isAirborne = false;
+            jumpsRemaining = MaxJumps;
+            
             /* We hit the ground, compute force */
             float heightdiff = TargetHeight - hit.distance;
             float force = SpringForce * heightdiff - DampingForce*rb.velocity.y;
@@ -127,6 +143,7 @@ public class PlayerController : MonoBehaviour
         else
         {
             /* We are airborne */
+            isAirborne = true;
             rb.AddForce(Physics.gravity);
         }
         
@@ -147,10 +164,31 @@ public class PlayerController : MonoBehaviour
         
     }
 
+    /// <summary>
+    /// The successful jump coroutine.
+    /// </summary>
+    /// <returns></returns>
     private IEnumerator OnJumpCoroutine()
     {
         inJumpGracePeriod = true;
         yield return new WaitForSeconds(JumpGracePeriod);
         inJumpGracePeriod = false;
+    }
+
+    private IEnumerator AirtimeTimer()
+    {
+        while (true)
+        {
+            if (isAirborne)
+            {
+                timeSinceAirborne += Time.deltaTime;
+            }
+            else
+            {
+                timeSinceAirborne = 0.0f;
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
     }
 }
