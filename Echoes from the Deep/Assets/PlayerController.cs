@@ -25,12 +25,16 @@ public class PlayerController : MonoBehaviour
     public float MaxForce = 150.0f;
     public float LateralDrag = 20.0f;
 
+    [Header("Jumping")] 
+    public float JumpForce = 10.0f;
+    public float JumpGracePeriod = 1.0f;
+
     private Rigidbody rb;
-
-    // private Vector3 moveDir = Vector3.zero;
-
+    
     private float verticalAngle = 0.0f;
     private Vector3 forwardDirectionEuler;
+
+    private bool inJumpGracePeriod = false;
 
     private void Awake()
     {
@@ -56,6 +60,13 @@ public class PlayerController : MonoBehaviour
         
         /* Forward direction target */
         forwardDirectionEuler.y += Sensitivity * mouse.x * Time.deltaTime;
+        
+        /* Jumping */
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            rb.AddForce(Vector3.up * JumpForce);
+            if (!inJumpGracePeriod) StartCoroutine(OnJumpCoroutine());
+        }
     }
 
     private void FixedUpdate()
@@ -89,9 +100,6 @@ public class PlayerController : MonoBehaviour
             /* Apply the lateral movement force */
             rb.AddForce(neededAccel * rb.mass);
             
-            // /* Update movement direction for rotation */
-            // var q = Quaternion.LookRotation(moveTarget, Vector3.up);
-            // moveDir = q.eulerAngles;
         }
         else
         {
@@ -99,20 +107,11 @@ public class PlayerController : MonoBehaviour
             Vector3 lateralVelocity = rb.velocity;
             lateralVelocity.y = 0;
             rb.AddForce(-lateralVelocity*LateralDrag);
-            
-            // /* Update movedir based on actual movement direction */
-            // if (lateralVelocity.sqrMagnitude > 0.01f)
-            // {
-            //     lateralVelocity.Normalize();
-            //
-            //     var q = Quaternion.LookRotation(lateralVelocity, Vector3.up);
-            //     moveDir = q.eulerAngles;
-            // }
         }
         
         /* Hovering */
         /* Raycast down to get height */
-        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, MaxAttachHeight, ~LayerMask.NameToLayer("Player")))
+        if (!inJumpGracePeriod && Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, MaxAttachHeight, ~LayerMask.NameToLayer("Player")))
         {
             /* We hit the ground, compute force */
             float heightdiff = TargetHeight - hit.distance;
@@ -120,10 +119,14 @@ public class PlayerController : MonoBehaviour
             
             /* Apply force */
             rb.AddForce(Vector3.up * force);
+            
+            /* Apply an equal and opposite force to the object below you */
+            var forceNeeded = Mathf.Abs(rb.velocity.y) / Time.fixedDeltaTime * rb.mass;
+            hit.rigidbody?.AddForce(10.0f * forceNeeded * Vector3.down);
         }
         else
         {
-            /* We are off the ground */
+            /* We are airborne */
             rb.AddForce(Physics.gravity);
         }
         
@@ -141,6 +144,13 @@ public class PlayerController : MonoBehaviour
         axis.Normalize();
         angle *= Mathf.Deg2Rad;
         rb.AddTorque((axis * (angle * SpringTorque)) - (rb.angularVelocity * DampingTorque));
+        
+    }
 
+    private IEnumerator OnJumpCoroutine()
+    {
+        inJumpGracePeriod = true;
+        yield return new WaitForSeconds(JumpGracePeriod);
+        inJumpGracePeriod = false;
     }
 }
