@@ -5,6 +5,10 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    [Header("Camera")] 
+    public Camera Camera;
+    public float Sensitivity = 400.0f;
+    
     [Header("Hovering")] 
     public float MaxAttachHeight = 4.0f;
     public float TargetHeight = 1.0f;
@@ -23,11 +27,35 @@ public class PlayerController : MonoBehaviour
 
     private Rigidbody rb;
 
-    private Vector3 moveDir = Vector3.zero;
+    // private Vector3 moveDir = Vector3.zero;
+
+    private float verticalAngle = 0.0f;
+    private Vector3 forwardDirectionEuler;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        
+        /* Lock the mouse */
+        Cursor.lockState = CursorLockMode.Locked;
+        
+        /* Update the initial forward direction */
+        forwardDirectionEuler = transform.forward;
+        forwardDirectionEuler.y = 0;
+        forwardDirectionEuler.Normalize();
+    }
+
+    private void Update()
+    {
+        /* Handle mouse movement */
+        Vector3 mouse = new Vector3(Input.GetAxisRaw("Mouse X"), 0f, Input.GetAxisRaw("Mouse Y"));
+        
+        /* Vertical angle */
+        verticalAngle = Mathf.Clamp(verticalAngle - Sensitivity * mouse.z * Time.deltaTime, -89f, 89f);
+        Camera.transform.localRotation = Quaternion.Euler(verticalAngle, 0.0f, 0.0f);
+        
+        /* Forward direction target */
+        forwardDirectionEuler.y += Sensitivity * mouse.x * Time.deltaTime;
     }
 
     private void FixedUpdate()
@@ -39,11 +67,8 @@ public class PlayerController : MonoBehaviour
         Vector3 planeTarget = new Vector3(horizontal, 0f, vertical);
         if (planeTarget.sqrMagnitude > 0)
         {
-            /* Project the movement direction relative to the camera */
-            Vector3 cameraForward = Camera.main.transform.forward;
-            cameraForward.y = 0;
-            cameraForward.Normalize();
-            Quaternion cameraDirection = Quaternion.LookRotation(cameraForward, Vector3.up);
+            /* Project the movement direction relative to the player */
+            Quaternion cameraDirection = Quaternion.LookRotation(Quaternion.Euler(forwardDirectionEuler) * Vector3.forward, Vector3.up);
             Vector3 moveTarget = cameraDirection * planeTarget;
             moveTarget.Normalize();
             
@@ -64,9 +89,9 @@ public class PlayerController : MonoBehaviour
             /* Apply the lateral movement force */
             rb.AddForce(neededAccel * rb.mass);
             
-            /* Update movement direction for rotation */
-            var q = Quaternion.LookRotation(moveTarget, Vector3.up);
-            moveDir = q.eulerAngles;
+            // /* Update movement direction for rotation */
+            // var q = Quaternion.LookRotation(moveTarget, Vector3.up);
+            // moveDir = q.eulerAngles;
         }
         else
         {
@@ -75,14 +100,14 @@ public class PlayerController : MonoBehaviour
             lateralVelocity.y = 0;
             rb.AddForce(-lateralVelocity*LateralDrag);
             
-            /* Update movedir based on actual movement direction */
-            if (lateralVelocity.sqrMagnitude > 0.01f)
-            {
-                lateralVelocity.Normalize();
-        
-                var q = Quaternion.LookRotation(lateralVelocity, Vector3.up);
-                moveDir = q.eulerAngles;
-            }
+            // /* Update movedir based on actual movement direction */
+            // if (lateralVelocity.sqrMagnitude > 0.01f)
+            // {
+            //     lateralVelocity.Normalize();
+            //
+            //     var q = Quaternion.LookRotation(lateralVelocity, Vector3.up);
+            //     moveDir = q.eulerAngles;
+            // }
         }
         
         /* Hovering */
@@ -104,7 +129,7 @@ public class PlayerController : MonoBehaviour
         
         /* Remain Upright */
         /* Determine the difference */
-        var targetRot = Quaternion.Euler(moveDir);
+        var targetRot = Quaternion.Euler(forwardDirectionEuler);
         var delta = targetRot * Quaternion.Inverse(transform.rotation);
         if (delta.w < 0.0f)
         {
@@ -114,7 +139,7 @@ public class PlayerController : MonoBehaviour
         /* Apply a corrective force */
         delta.ToAngleAxis(out var angle, out var axis);
         axis.Normalize();
-        angle = angle * Mathf.Deg2Rad;
+        angle *= Mathf.Deg2Rad;
         rb.AddTorque((axis * (angle * SpringTorque)) - (rb.angularVelocity * DampingTorque));
 
     }
